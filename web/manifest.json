@@ -1,6 +1,6 @@
 {
-    "name": "flutter_exemplo_aula",
-    "short_name": "flutter_exemplo_aula",
+    "name": "aplicacao_aula",
+    "short_name": "aplicacao_aula",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
