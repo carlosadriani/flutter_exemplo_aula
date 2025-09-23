@@ -1,5 +1,5 @@
+import 'package:aplicacao_aula/view/home_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_exemplo_aula/view/home_page.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -11,7 +11,7 @@ class App extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const HomePage(title: 'Flutter Demo Home Page'),
+      home: const HomePage(),
     );
   }
 }
