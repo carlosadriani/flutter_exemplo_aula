@@ -1,3 +1,4 @@
+import 'package:aplicacao_aula/view/widgets/logout_button.dart';
 import 'package:flutter/material.dart';
 import 'package:aplicacao_aula/controller/relatorios_controller.dart';
 import 'package:aplicacao_aula/model/relatorio.dart';
@@ -86,6 +87,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         title: const Text("Relatórios"),
+        actions: const [LogoutButton()],
       ),
       body: relatorios.isEmpty
           ? const Center(child: Text("Nenhum relatório criado."))
