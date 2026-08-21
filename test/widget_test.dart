@@ -9,13 +9,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('a splash exibe o nome do app', (WidgetTester tester) async {
+  testWidgets('a splash anima o logotipo', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
 
     expect(find.text('Meu App'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+
+    // Busca por Key: o proprio MaterialApp cria FadeTransition na transicao
+    // de rota, entao byType encontraria mais de um widget.
+    double opacidade() => tester
+        .widget<FadeTransition>(find.byKey(const Key('splash-fade')))
+        .opacity
+        .value;
+    double escala() => tester
+        .widget<ScaleTransition>(find.byKey(const Key('splash-escala')))
+        .scale
+        .value;
+
+    // No primeiro quadro a animacao ainda nao avancou.
+    expect(opacidade(), 0.0);
+    expect(escala(), lessThan(1.0));
+
+    // Meio segundo depois o logo ja apareceu e cresceu.
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(opacidade(), greaterThan(0.0));
+    expect(escala(), greaterThan(0.75));
 
     // Troca a árvore para descartar a SplashScreen: o dispose dela cancela o
-    // Timer de 2 segundos. Sem isso o teste falha com "Timer pendente".
+    // Timer e o AnimationController. Sem isso o teste falha com
+    // "Timer pendente" / "AnimationController não liberado".
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
