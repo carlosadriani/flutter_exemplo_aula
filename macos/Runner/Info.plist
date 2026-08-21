@@ -28,5 +28,23 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- Login com Google: substitua pelo REVERSED_CLIENT_ID do seu cliente
+	     OAuth do tipo iOS. E o Client ID com os segmentos invertidos, por
+	     exemplo com.googleusercontent.apps.000000000000-xxxxxxxx -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.TODO-SEU-REVERSED-CLIENT-ID</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Opcional: se preferir nao passar o clientId por codigo, informe aqui.
+	<key>GIDClientID</key>
+	<string>TODO-SEU-CLIENT-ID-IOS.apps.googleusercontent.com</string>
+	-->
 </dict>
 </plist>

@@ -1,11 +1,17 @@
 import 'package:aplicacao_aula/controller/auth_controller.dart';
-import 'package:aplicacao_aula/view/login_page.dart';
 import 'package:aplicacao_aula/view/pessoas_page.dart';
 import 'package:aplicacao_aula/view/produtos_page.dart';
 import 'package:aplicacao_aula/view/relatorios_page.dart';
+import 'package:aplicacao_aula/view/widgets/logout_button.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+/// Casca da aplicação: é ela quem tem a BottomNavigationBar.
+///
+/// Antes cada toque na barra fazia Navigator.push de uma página nova, o que
+/// empilhava telas indefinidamente e fazia o índice selecionado nunca
+/// corresponder à tela visível. Com IndexedStack as quatro abas são
+/// construídas uma única vez e apenas trocam de visibilidade, preservando o
+/// estado de cada uma (a lista de produtos não some mais ao trocar de aba).
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -15,95 +21,25 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _indiceAtual = 0;
-  String? _savedToken;
-  Map<String, dynamic>? savedUser;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadToken();
-  }
-
-  @override
-  void dispose() async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.remove("auth_token");
-    super.dispose();
-  }
-
-  Future<void> _loadToken() async {
-    savedUser = await AuthStorage.getUserData();
-    setState(() {
-      _savedToken = savedUser?['accessToken'];
-    });
-  }
-
-  void _abrirPagina(int index) {
-    Widget pagina = PessoasPage();
-    switch (index) {
-      case 0:
-        pagina = const PessoasPage();
-        break;
-      case 1:
-        pagina = const ProdutosPage();
-        break;
-      case 2:
-        pagina = const RelatoriosPage();
-        break;
-      default:
-        pagina = HomePage();
-    }
-    Navigator.push(context, MaterialPageRoute(builder: (context) => pagina));
-  }
+  static const List<Widget> _abas = [
+    InicioTab(),
+    PessoasPage(),
+    ProdutosPage(),
+    RelatoriosPage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        title: const Text("Home Page", style: TextStyle(color: Colors.white)),
-        actions: [
-          IconButton(
-            onPressed: () {
-              // Limpar os dados do usuário ao fazer logout
-              AuthStorage.clearUserData();
-              // Carregar a tela de login
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => LoginPage()),
-              );
-            },
-            icon: Icon(Icons.logout),
-          ),
-          // SizedBox(width: 10),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              savedUser?['username'] == "Male" ? "Bem-vindo, " : "Bem-vinda, ",
-            ),
-            Text(
-              "${savedUser?['firstName']} ${savedUser?['lastName']}",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            if (savedUser?['image'] != null)
-              Image(image: NetworkImage(savedUser?['image']), width: 150),
-          ],
-        ),
-      ),
+      body: IndexedStack(index: _indiceAtual, children: _abas),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _indiceAtual,
-        onTap: (index) {
-          setState(() {
-            _indiceAtual = index;
-          });
-          _abrirPagina(index);
-        },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.deepPurple,
+        onTap: (index) => setState(() => _indiceAtual = index),
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Início"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Pessoas"),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),
@@ -113,6 +49,83 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.bar_chart),
             label: "Relatórios",
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Aba inicial: mostra os dados do usuário autenticado.
+class InicioTab extends StatefulWidget {
+  const InicioTab({super.key});
+
+  @override
+  State<InicioTab> createState() => _InicioTabState();
+}
+
+class _InicioTabState extends State<InicioTab> {
+  Map<String, dynamic>? _usuario;
+  bool _carregando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarUsuario();
+  }
+
+  Future<void> _carregarUsuario() async {
+    final usuario = await AuthStorage.getUserData();
+    // Depois de um await o widget pode já ter sido removido da árvore.
+    if (!mounted) return;
+    setState(() {
+      _usuario = usuario;
+      _carregando = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+        title: const Text("Home Page"),
+        actions: const [LogoutButton()],
+      ),
+      body: _carregando
+          ? const Center(child: CircularProgressIndicator())
+          : _corpo(),
+    );
+  }
+
+  Widget _corpo() {
+    // O campo correto para a saudação é "gender", não "username".
+    // Uma conta do Google não informa gênero: nesse caso usamos algo neutro.
+    final genero = _usuario?['gender'];
+    final saudacao = switch (genero) {
+      'male' => "Bem-vindo, ",
+      'female' => "Bem-vinda, ",
+      _ => "Olá, ",
+    };
+    final nome = [_usuario?['firstName'], _usuario?['lastName']]
+        .where((p) => p != null && p.toString().isNotEmpty)
+        .join(' ');
+    final imagem = _usuario?['image'] as String?;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(saudacao),
+          Text(
+            nome.isEmpty ? "Usuário" : nome,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          if (imagem != null && imagem.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Image(image: NetworkImage(imagem), width: 150),
+            ),
         ],
       ),
     );

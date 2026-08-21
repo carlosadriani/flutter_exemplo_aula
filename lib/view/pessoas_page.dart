@@ -1,9 +1,7 @@
-import 'package:aplicacao_aula/repository/pessoa_repository.dart';
-import 'package:aplicacao_aula/view/home_page.dart';
-import 'package:aplicacao_aula/view/produtos_page.dart';
-import 'package:aplicacao_aula/view/relatorios_page.dart';
-import 'package:flutter/material.dart';
 import 'package:aplicacao_aula/model/user.dart';
+import 'package:aplicacao_aula/repository/pessoa_repository.dart';
+import 'package:aplicacao_aula/view/widgets/logout_button.dart';
+import 'package:flutter/material.dart';
 
 class PessoasPage extends StatefulWidget {
   const PessoasPage({super.key});
@@ -13,8 +11,6 @@ class PessoasPage extends StatefulWidget {
 }
 
 class _PessoasPageState extends State<PessoasPage> {
-  int _indiceAtual = 0;
-
   final PessoaRepository _repository = PessoaRepository();
   late Future<List<UserModel>> _futurePessoas;
 
@@ -24,24 +20,6 @@ class _PessoasPageState extends State<PessoasPage> {
     _futurePessoas = _repository.getPessoas();
   }
 
-  void _abrirPagina(int index) {
-    Widget pagina = PessoasPage();
-    switch (index) {
-      case 0:
-        pagina = const PessoasPage();
-        break;
-      case 1:
-        pagina = const ProdutosPage();
-        break;
-      case 2:
-        pagina = const RelatoriosPage();
-        break;
-      default:
-        pagina = HomePage();
-    }
-    Navigator.push(context, MaterialPageRoute(builder: (context) => pagina));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,6 +27,7 @@ class _PessoasPageState extends State<PessoasPage> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         title: const Text("Lista de Usuários"),
+        actions: const [LogoutButton()],
       ),
       body: FutureBuilder<List<UserModel>>(
         future: _futurePessoas,
@@ -98,26 +77,6 @@ class _PessoasPageState extends State<PessoasPage> {
             );
           }
         },
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _indiceAtual,
-        onTap: (index) {
-          setState(() {
-            _indiceAtual = index;
-          });
-          _abrirPagina(index);
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Pessoas"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: "Produtos",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: "Relatórios",
-          ),
-        ],
       ),
     );
   }

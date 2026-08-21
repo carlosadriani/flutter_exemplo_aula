@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 
 import 'package:aplicacao_aula/controller/auth_controller.dart';
+import 'package:aplicacao_aula/service/google_auth_service.dart';
+import 'package:aplicacao_aula/view/widgets/google_sign_in_button.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'home_page.dart';
 
@@ -18,40 +22,76 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _loading = false;
   String? _errorMessage;
-  String? _savedToken;
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _assinaturaGoogle;
 
   @override
   void initState() {
+    super.initState();
     // Comentar estas linhas para não preencher automaticamente
     _usernameController.text = 'emilys';
     _passwordController.text = 'emilyspass';
-    //
-    _loadToken();
-    super.initState();
+    _prepararGoogle();
   }
 
   @override
   void dispose() {
+    _assinaturaGoogle?.cancel();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadToken() async {
-    final savedUser = await AuthStorage.getUserData();
-    _savedToken = savedUser?['accessToken'];
-    setState(() {
-      if (_savedToken != null) {
-        _usernameController.text = 'emilys';
-      }
-    });
+  /// O login com Google não devolve o usuário como retorno do método: ele
+  /// chega neste stream, tanto no clique do botão quanto no login silencioso.
+  Future<void> _prepararGoogle() async {
+    try {
+      await GoogleAuthService.initialize();
+      _assinaturaGoogle = GoogleAuthService.eventos.listen(
+        _aoEventoGoogle,
+        onError: _mostrarErroGoogle,
+      );
+    } catch (e) {
+      _mostrarErroGoogle(e);
+    }
+  }
+
+  Future<void> _aoEventoGoogle(GoogleSignInAuthenticationEvent evento) async {
+    if (evento is! GoogleSignInAuthenticationEventSignIn) return;
+
+    await AuthStorage.saveUserData(
+      GoogleAuthService.paraMapaDeUsuario(evento.user),
+    );
+    if (!mounted) return;
+    _irParaHome();
+  }
+
+  void _mostrarErroGoogle(Object erro) {
+    if (!mounted) return;
+    final detalhe = erro is GoogleSignInException
+        ? '${erro.code.name}: ${erro.description ?? ''}'
+        : '$erro';
+    setState(() => _errorMessage = 'Falha no login com Google - $detalhe');
+  }
+
+  void _irParaHome() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
   }
 
   Future<void> _login() async {
+    if (_usernameController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe usuário e senha.');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
+
     try {
       final response = await http.post(
         Uri.parse('https://dummyjson.com/auth/login'),
@@ -61,38 +101,19 @@ class _LoginPageState extends State<LoginPage> {
           "password": _passwordController.text.trim(),
         }),
       );
-      setState(() {
-        _loading = false;
-      });
+
       switch (response.statusCode) {
         case 200:
-          final data = jsonDecode(response.body);
-          String token = data['accessToken'];
-          log('token:[$token]');
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          log('token:[${data['accessToken']}]');
 
-          await AuthStorage.saveUserData(jsonDecode(response.body));
-          // final prefs = await SharedPreferences.getInstance();
-          // await prefs.setString("auth_token", token);
-          // await prefs.setString("username", _usernameController.text.trim());
-          // await prefs.setString("id", data['id'].toString());
-          // await prefs.setString("firstName", data['firstName'] ?? '');
-          // await prefs.setString("lastName", data['lastName'] ?? '');
-          // await prefs.setString("email", data['email'] ?? '');
-          // await prefs.setString("image", data['image'] ?? '');
-          // await prefs.setString("gender", data['gender'] ?? '');
+          await AuthStorage.saveUserData(data);
 
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomePage()),
-          );
-          break;
+          // Sem esta guarda o Navigator pode ser usado com um context morto.
+          if (!mounted) return;
+          _irParaHome();
         case 400:
-          setState(() {
-            // _usernameController.clear();
-            // _passwordController.clear();
-            _errorMessage = 'Login inválido!';
-          });
-        // throw Exception('Login inválido!');
+          setState(() => _errorMessage = 'Login inválido!');
         case 401:
           throw Exception('Não autorizado (401)');
         case 403:
@@ -105,9 +126,16 @@ class _LoginPageState extends State<LoginPage> {
           throw Exception('Erro desconhecido (${response.statusCode})');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = "$e";
       });
+    } finally {
+      // No código anterior o _loading ficava preso em true quando a
+      // requisição falhava (por exemplo, sem internet).
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -115,54 +143,68 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Card(
-          elevation: 20,
-          child: Container(
-            width: 400,
-            height: 500,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Image(
-                  image: AssetImage('assets/images/logoUPF.png'),
-                  width: 150,
-                ),
-                const Text("Login", style: TextStyle(fontSize: 28)),
-                TextField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(labelText: "Usuário"),
-                ),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: "Senha"),
-                ),
-                const SizedBox(height: 20),
-                if (_errorMessage != null)
-                  Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+        child: SingleChildScrollView(
+          child: Card(
+            elevation: 20,
+            child: Container(
+              width: 400,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Image(
+                    image: AssetImage('assets/images/logoUPF.png'),
+                    width: 150,
                   ),
-                const SizedBox(height: 20),
-                _loading
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 30,
-                            vertical: 15,
+                  const Text("Login", style: TextStyle(fontSize: 28)),
+                  TextField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(labelText: "Usuário"),
+                  ),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: "Senha"),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_errorMessage != null)
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  const SizedBox(height: 20),
+                  _loading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
+                          onPressed: _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepPurple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 30,
+                              vertical: 15,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          child: const Text("Entrar"),
                         ),
-                        child: const Text("Entrar"),
+                  const SizedBox(height: 24),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text("ou"),
                       ),
-              ],
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  GoogleSignInButton(aoFalhar: _mostrarErroGoogle),
+                ],
+              ),
             ),
           ),
         ),

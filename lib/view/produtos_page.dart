@@ -1,4 +1,5 @@
 import 'package:aplicacao_aula/model/produto.dart';
+import 'package:aplicacao_aula/view/widgets/logout_button.dart';
 import 'package:flutter/material.dart';
 import 'package:aplicacao_aula/controller/produtos_controller.dart';
 
@@ -97,6 +98,7 @@ class _ProdutosPageState extends State<ProdutosPage> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         title: const Text("Cadastro de Produtos"),
+        actions: const [LogoutButton()],
       ),
       body: produtos.isEmpty
           ? const Center(child: Text("Nenhum produto cadastrado."))
