@@ -4,7 +4,6 @@ import 'package:aplicacao_aula/view/pessoas_page.dart';
 import 'package:aplicacao_aula/view/produtos_page.dart';
 import 'package:aplicacao_aula/view/relatorios_page.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,31 +14,36 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _indiceAtual = 0;
-  String? _savedToken;
-  Map<String, dynamic>? savedUser;
+  Map<String, dynamic>? _usuario;
+  bool _carregando = true;
 
   @override
   void initState() {
     super.initState();
-    _loadToken();
+    _carregarUsuario();
   }
 
-  @override
-  void dispose() async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.remove("auth_token");
-    super.dispose();
-  }
-
-  Future<void> _loadToken() async {
-    savedUser = await AuthStorage.getUserData();
+  Future<void> _carregarUsuario() async {
+    final usuario = await AuthStorage.getUserData();
+    // Depois de um await o widget pode ja ter sido removido da arvore.
+    if (!mounted) return;
     setState(() {
-      _savedToken = savedUser?['accessToken'];
+      _usuario = usuario;
+      _carregando = false;
     });
   }
 
+  Future<void> _sair() async {
+    await AuthStorage.clearUserData();
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+    );
+  }
+
   void _abrirPagina(int index) {
-    Widget pagina = PessoasPage();
+    Widget pagina;
     switch (index) {
       case 0:
         pagina = const PessoasPage();
@@ -51,7 +55,7 @@ class _HomePageState extends State<HomePage> {
         pagina = const RelatoriosPage();
         break;
       default:
-        pagina = HomePage();
+        pagina = const HomePage();
     }
     Navigator.push(context, MaterialPageRoute(builder: (context) => pagina));
   }
@@ -65,36 +69,15 @@ class _HomePageState extends State<HomePage> {
         title: const Text("Home Page", style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
-            onPressed: () {
-              // Limpar os dados do usuário ao fazer logout
-              AuthStorage.clearUserData();
-              // Carregar a tela de login
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => LoginPage()),
-              );
-            },
-            icon: Icon(Icons.logout),
+            onPressed: _sair,
+            tooltip: "Sair",
+            icon: const Icon(Icons.logout),
           ),
-          // SizedBox(width: 10),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              savedUser?['username'] == "Male" ? "Bem-vindo, " : "Bem-vinda, ",
-            ),
-            Text(
-              "${savedUser?['firstName']} ${savedUser?['lastName']}",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            if (savedUser?['image'] != null)
-              Image(image: NetworkImage(savedUser?['image']), width: 150),
-          ],
-        ),
-      ),
+      body: _carregando
+          ? const Center(child: CircularProgressIndicator())
+          : _corpo(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _indiceAtual,
         onTap: (index) {
@@ -113,6 +96,31 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.bar_chart),
             label: "Relatórios",
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _corpo() {
+    // O campo correto para a saudacao e "gender", nao "username".
+    final saudacao = _usuario?['gender'] == 'male' ? "Bem-vindo, " : "Bem-vinda, ";
+    final nome = [
+      _usuario?['firstName'],
+      _usuario?['lastName'],
+    ].where((p) => p != null && p.toString().isNotEmpty).join(' ');
+    final imagem = _usuario?['image'] as String?;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(saudacao),
+          Text(
+            nome.isEmpty ? "Usuário" : nome,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          if (imagem != null && imagem.isNotEmpty)
+            Image(image: NetworkImage(imagem), width: 150),
         ],
       ),
     );

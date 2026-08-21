@@ -18,16 +18,13 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _loading = false;
   String? _errorMessage;
-  String? _savedToken;
 
   @override
   void initState() {
+    super.initState();
     // Comentar estas linhas para não preencher automaticamente
     _usernameController.text = 'emilys';
     _passwordController.text = 'emilyspass';
-    //
-    _loadToken();
-    super.initState();
   }
 
   @override
@@ -37,21 +34,18 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> _loadToken() async {
-    final savedUser = await AuthStorage.getUserData();
-    _savedToken = savedUser?['accessToken'];
-    setState(() {
-      if (_savedToken != null) {
-        _usernameController.text = 'emilys';
-      }
-    });
-  }
-
   Future<void> _login() async {
+    if (_usernameController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe usuário e senha.');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
+
     try {
       final response = await http.post(
         Uri.parse('https://dummyjson.com/auth/login'),
@@ -61,38 +55,22 @@ class _LoginPageState extends State<LoginPage> {
           "password": _passwordController.text.trim(),
         }),
       );
-      setState(() {
-        _loading = false;
-      });
+
       switch (response.statusCode) {
         case 200:
-          final data = jsonDecode(response.body);
-          String token = data['accessToken'];
-          log('token:[$token]');
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          log('token:[${data['accessToken']}]');
 
-          await AuthStorage.saveUserData(jsonDecode(response.body));
-          // final prefs = await SharedPreferences.getInstance();
-          // await prefs.setString("auth_token", token);
-          // await prefs.setString("username", _usernameController.text.trim());
-          // await prefs.setString("id", data['id'].toString());
-          // await prefs.setString("firstName", data['firstName'] ?? '');
-          // await prefs.setString("lastName", data['lastName'] ?? '');
-          // await prefs.setString("email", data['email'] ?? '');
-          // await prefs.setString("image", data['image'] ?? '');
-          // await prefs.setString("gender", data['gender'] ?? '');
+          await AuthStorage.saveUserData(data);
 
+          // Sem esta guarda o Navigator pode ser usado com um context morto.
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => HomePage()),
+            MaterialPageRoute(builder: (_) => const HomePage()),
           );
-          break;
         case 400:
-          setState(() {
-            // _usernameController.clear();
-            // _passwordController.clear();
-            _errorMessage = 'Login inválido!';
-          });
-        // throw Exception('Login inválido!');
+          setState(() => _errorMessage = 'Login inválido!');
         case 401:
           throw Exception('Não autorizado (401)');
         case 403:
@@ -105,9 +83,16 @@ class _LoginPageState extends State<LoginPage> {
           throw Exception('Erro desconhecido (${response.statusCode})');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = "$e";
       });
+    } finally {
+      // No código anterior o _loading ficava preso em true quando a
+      // requisição falhava (por exemplo, sem internet).
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

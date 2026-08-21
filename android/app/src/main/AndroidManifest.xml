@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necessaria para as chamadas HTTP (dummyjson) e para o login com Google.
+         O manifesto de debug ja possui esta permissao, mas em release ela
+         precisa estar declarada aqui, senao nenhuma requisicao funciona. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="aplicacao_aula"
         android:name="${applicationName}"
