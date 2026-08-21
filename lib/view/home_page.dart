@@ -100,9 +100,13 @@ class _InicioTabState extends State<InicioTab> {
 
   Widget _corpo() {
     // O campo correto para a saudação é "gender", não "username".
-    final saudacao = _usuario?['gender'] == 'male'
-        ? "Bem-vindo, "
-        : "Bem-vinda, ";
+    // Uma conta do Google não informa gênero: nesse caso usamos algo neutro.
+    final genero = _usuario?['gender'];
+    final saudacao = switch (genero) {
+      'male' => "Bem-vindo, ",
+      'female' => "Bem-vinda, ",
+      _ => "Olá, ",
+    };
     final nome = [_usuario?['firstName'], _usuario?['lastName']]
         .where((p) => p != null && p.toString().isNotEmpty)
         .join(' ');

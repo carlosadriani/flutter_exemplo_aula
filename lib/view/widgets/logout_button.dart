@@ -1,4 +1,5 @@
 import 'package:aplicacao_aula/controller/auth_controller.dart';
+import 'package:aplicacao_aula/service/google_auth_service.dart';
 import 'package:aplicacao_aula/view/login_page.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +14,9 @@ class LogoutButton extends StatelessWidget {
       icon: const Icon(Icons.logout),
       onPressed: () async {
         await AuthStorage.clearUserData();
+        // Encerra também a sessão do Google, senão o próximo login entra
+        // direto com a mesma conta sem perguntar nada.
+        await GoogleAuthService.sair();
         if (!context.mounted) return;
         // pushAndRemoveUntil descarta toda a pilha: depois do logout o
         // usuário não consegue voltar para dentro do app pelo botão voltar.
